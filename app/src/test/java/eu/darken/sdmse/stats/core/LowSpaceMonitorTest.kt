@@ -125,8 +125,8 @@ class LowSpaceMonitorTest : BaseTest() {
                 flowOf(history[id].orEmpty())
             }
         }
-        // A StateFlow (which never completes) so a non-Pro isProSettled() takes its documented
-        // timeout path instead of throwing on an exhausted flow.
+        // A StateFlow (which never completes) so an unsettled entitlement takes the observer's
+        // "waiting" path instead of throwing on an exhausted flow.
         val infoFlow = MutableStateFlow(upgradeInfo(isPro = isPro, isSettled = isSettled))
         val upgradeRepo = mockk<UpgradeRepo>(relaxed = true).apply {
             every { upgradeInfo } returns infoFlow
@@ -247,14 +247,17 @@ class LowSpaceMonitorTest : BaseTest() {
     }
 
     @Test
-    fun `a non-Pro user cancels and re-arms`() = runTest2 {
-        val h = harness(isPro = false, armed = false, primary = reading())
+    fun `the toggle no longer consults entitlement, so the warning speaks`() = runTest2 {
+        // The warning used to be Pro-only: this exact shape (low volume, no Pro) cancelled and
+        // re-armed. Entitlement is unconditional now, so the check() path proceeds and the spent
+        // latch is the only thing that can keep it quiet.
+        val h = harness(isPro = false, armed = true, primary = reading())
 
         h.monitor.check()
 
-        verify(exactly = 0) { h.notifications.notifyLowSpace(any(), any()) }
-        verify(exactly = 1) { h.notifications.cancel() }
-        h.armed.value() shouldBe true
+        verify(exactly = 1) { h.notifications.notifyLowSpace(StorageForecast.BelowFloor, floor - 1) }
+        verify(exactly = 0) { h.notifications.cancel() }
+        h.armed.value() shouldBe false
     }
 
     @Test
