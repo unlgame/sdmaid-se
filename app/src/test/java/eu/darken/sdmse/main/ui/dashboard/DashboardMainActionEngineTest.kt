@@ -1085,9 +1085,11 @@ internal class DashboardMainActionEngineTest : BaseTest() {
     }
 
     @Test
-    fun `a zero-result cleanup still reports what stayed locked`() {
-        // The cleanup ran on the free tool and freed nothing, while AppCleaner's findings sat there
-        // unclaimed behind Pro — exactly the moment worth surfacing the upsell.
+    fun `a zero-result cleanup reports nothing locked`() {
+        // The cleanup ran on the free tool and freed nothing, while AppCleaner's findings were the
+        // Pro-gated part of the card. Entitlement is unconditional now, so those findings are not
+        // "behind Pro" any more: they are submitted alongside the free tool, which is why nothing
+        // is left over to advertise as an upsell.
         val h = harness(
             corpseData = corpseData(),
             appData = AppCleaner.Data(
@@ -1102,8 +1104,9 @@ internal class DashboardMainActionEngineTest : BaseTest() {
 
             val hero = h.barState().heroSummary!!
             hero.mode shouldBe HeroSummary.Mode.NOTHING_FREED
-            hero.lockedTools.map { it.type } shouldBe listOf(SDMTool.Type.APPCLEANER)
-            hero.lockedSize shouldBe 999L
+            h.submittedTasks.filterIsInstance<AppCleanerProcessingTask>().size shouldBe 1
+            hero.lockedTools.shouldBeEmpty()
+            hero.lockedSize shouldBe 0L
         } finally {
             h.engineScope.cancel()
         }

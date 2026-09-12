@@ -247,10 +247,10 @@ class LowSpaceMonitorTest : BaseTest() {
     }
 
     @Test
-    fun `the toggle no longer consults entitlement, so the warning speaks`() = runTest2 {
-        // The warning used to be Pro-only: this exact shape (low volume, no Pro) cancelled and
-        // re-armed. Entitlement is unconditional now, so the check() path proceeds and the spent
-        // latch is the only thing that can keep it quiet.
+    fun `a non-Pro user is no longer a reason to stay quiet`() = runTest2 {
+        // The warning used to be Pro-only: this exact shape (low volume, non-Pro) cancelled and
+        // re-armed without ever speaking. checkInternal() consults isProSettled(), which is
+        // unconditional now, so the warning posts like it does for anyone else.
         val h = harness(isPro = false, armed = true, primary = reading())
 
         h.monitor.check()
