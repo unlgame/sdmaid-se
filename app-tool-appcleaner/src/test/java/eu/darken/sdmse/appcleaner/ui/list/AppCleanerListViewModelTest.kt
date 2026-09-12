@@ -244,7 +244,9 @@ class AppCleanerListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `onRowClick navs to upgrade and does not confirm when not pro`() = runTest2 {
+    fun `onRowClick emits ConfirmDeletion when not pro`() = runTest2 {
+        // The upgrade gate is gone: isProForUi() is unconditional now, so an unowned upgrade
+        // state no longer reroutes the tap to the sponsorship screen.
         val a = junk("com.example.only")
         val h = harness(data = AppCleaner.Data(junks = listOf(a)), isPro = false)
         val navCollected = collectNavEvents(h.vm)
@@ -254,26 +256,28 @@ class AppCleanerListViewModelTest : BaseTest() {
         h.vm.onRowClick(row)
         advanceUntilIdle()
 
-        navCollected.list.any { it is NavEvent.GoTo } shouldBe true
-        collected.list shouldBe emptyList()
+        val event = collected.list.single()
+        event.shouldBeInstanceOf<AppCleanerListViewModel.Event.ConfirmDeletion>()
+        event.ids shouldBe setOf(a.identifier)
+        navCollected.list shouldBe emptyList()
         navCollected.cancel()
         collected.cancel()
     }
 
     @Test
-    fun `onDeleteSelected navs to upgrade and does not confirm when not pro`() = runTest2 {
+    fun `onDeleteSelected emits ConfirmDeletion when not pro`() = runTest2 {
         val a = junk("com.example.a")
         val h = harness(data = AppCleaner.Data(junks = listOf(a)), isPro = false)
         val navCollected = collectNavEvents(h.vm)
-        val collected = collectEvents(h.vm)
 
         h.vm.onDeleteSelected(setOf(a.identifier))
         advanceUntilIdle()
 
-        navCollected.list.any { it is NavEvent.GoTo } shouldBe true
-        collected.list shouldBe emptyList()
+        val event = h.vm.events.first()
+        event.shouldBeInstanceOf<AppCleanerListViewModel.Event.ConfirmDeletion>()
+        event.ids shouldBe setOf(a.identifier)
+        navCollected.list shouldBe emptyList()
         navCollected.cancel()
-        collected.cancel()
     }
 
     @Test
@@ -313,18 +317,28 @@ class AppCleanerListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `onDeleteConfirmed navs to upgrade when not pro`() = runTest2 {
+    fun `onDeleteConfirmed submits the task when not pro`() = runTest2 {
         val live = junk("com.example.live")
         val h = harness(data = AppCleaner.Data(junks = listOf(live)), isPro = false)
         val navCollected = collectNavEvents(h.vm)
 
+        val successResult = AppCleanerProcessingTask.Success(
+            affectedSpace = 100L,
+            affectedPaths = emptySet(),
+        )
+        coEvery { h.taskSubmitter.submit(any()) } returns successResult
+
         h.vm.onDeleteConfirmed(setOf(live.identifier))
         advanceUntilIdle()
 
-        // Nav to UpgradeRoute — observed as a GoTo nav event with the upgrade destination.
-        navCollected.list.any { it is NavEvent.GoTo } shouldBe true
-        // Task must not be submitted before user upgrades.
-        coVerify(exactly = 0) { h.taskSubmitter.submit(any()) }
+        coVerify(exactly = 1) {
+            h.taskSubmitter.submit(AppCleanerProcessingTask(targetPkgs = setOf(live.identifier)))
+        }
+
+        val event = h.vm.events.first()
+        event.shouldBeInstanceOf<AppCleanerListViewModel.Event.TaskResult>()
+        event.result shouldBe successResult
+        navCollected.list shouldBe emptyList()
         navCollected.cancel()
     }
 

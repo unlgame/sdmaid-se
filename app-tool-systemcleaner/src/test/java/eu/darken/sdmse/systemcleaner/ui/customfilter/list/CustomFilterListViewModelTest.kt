@@ -4,7 +4,6 @@ import android.content.Context
 import eu.darken.sdmse.common.WebpageTool
 import eu.darken.sdmse.common.filter.CustomFilterEditorRoute
 import eu.darken.sdmse.common.navigation.NavEvent
-import eu.darken.sdmse.common.navigation.routes.UpgradeRoute
 import eu.darken.sdmse.common.upgrade.UpgradeRepo
 import eu.darken.sdmse.systemcleaner.core.SystemCleanerSettings
 import eu.darken.sdmse.systemcleaner.core.filter.custom.CustomFilterConfig
@@ -19,7 +18,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.jupiter.api.Test
 import testhelpers.BaseTest
@@ -135,7 +133,9 @@ class CustomFilterListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `onEditClick when not pro navigates to UpgradeRoute`() = runTest2 {
+    fun `onEditClick when not pro still navigates to CustomFilterEditorRoute`() = runTest2 {
+        // The upgrade gate is gone: onEditClick no longer diverts to UpgradeRoute, so the route
+        // carries the row's identifier for an unowned upgrade state too.
         val a = config("a", "A")
         val h = buildHarness(configs = listOf(a), isPro = false)
 
@@ -144,7 +144,9 @@ class CustomFilterListViewModelTest : BaseTest() {
 
         val event = h.vm.navEvents.first()
         event.shouldBeInstanceOf<NavEvent.GoTo>()
-        event.destination.shouldBeInstanceOf<UpgradeRoute>()
+        val dest = event.destination
+        dest.shouldBeInstanceOf<CustomFilterEditorRoute>()
+        dest.identifier shouldBe "a"
     }
 
     @Test
@@ -163,7 +165,7 @@ class CustomFilterListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `onCreateClick when not pro navigates to UpgradeRoute`() = runTest2 {
+    fun `onCreateClick when not pro still navigates to CustomFilterEditorRoute`() = runTest2 {
         val h = buildHarness(isPro = false)
 
         h.vm.onCreateClick()
@@ -171,7 +173,10 @@ class CustomFilterListViewModelTest : BaseTest() {
 
         val event = h.vm.navEvents.first()
         event.shouldBeInstanceOf<NavEvent.GoTo>()
-        event.destination.shouldBeInstanceOf<UpgradeRoute>()
+        val dest = event.destination
+        dest.shouldBeInstanceOf<CustomFilterEditorRoute>()
+        dest.identifier shouldBe null
+        (dest.initial != null) shouldBe true
     }
 
     @Test
@@ -220,16 +225,17 @@ class CustomFilterListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `exportRows when not pro navigates to UpgradeRoute`() = runTest2 {
+    fun `exportRows when not pro still emits LaunchExport after staging`() = runTest2 {
         val a = config("a", "A")
         val h = buildHarness(configs = listOf(a), isPro = false)
+        coEvery { h.repo.exportFilters(any()) } returns emptyList()
 
         h.vm.exportRows(listOf(CustomFilterListViewModel.FilterRow(config = a, isEnabled = false)))
         advanceUntilIdle()
 
-        val event = h.vm.navEvents.first()
-        event.shouldBeInstanceOf<NavEvent.GoTo>()
-        event.destination.shouldBeInstanceOf<UpgradeRoute>()
+        val event = h.vm.events.first()
+        event.shouldBeInstanceOf<CustomFilterListViewModel.Event.LaunchExport>()
+        coVerify(exactly = 1) { h.repo.exportFilters(listOf("a")) }
     }
 
     @Test

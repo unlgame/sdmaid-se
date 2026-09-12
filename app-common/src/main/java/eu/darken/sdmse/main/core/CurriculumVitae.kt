@@ -87,7 +87,14 @@ class CurriculumVitae @Inject constructor(
 
         val upgradedAt = try {
             upgradeRepo.get().upgradeInfo
-                .filter { !it.isPro || it.upgradedAt != null }
+                // Wait for an authoritative emission, not for a Pro one. The old predicate
+                // (`!isPro || upgradedAt != null`) presumed non-Pro meant "no upgrade date, answer
+                // immediately"; once entitlement stopped depending on the sponsorship record that
+                // branch became unreachable for ordinary installs, so the flow waited out the
+                // timeout on every launch and logged an error. Settledness is the property that
+                // actually means "this emission can be trusted", and it is true from the first
+                // FOSS emission and once billing has answered on GPlay.
+                .filter { it.isSettled }
                 .timeout(5.seconds)
                 .first()
                 .upgradedAt

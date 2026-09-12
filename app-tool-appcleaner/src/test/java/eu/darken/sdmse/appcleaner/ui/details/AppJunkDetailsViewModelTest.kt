@@ -199,17 +199,22 @@ class AppJunkDetailsViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `requestDelete navs to upgrade when not pro`() = runTest2 {
+    fun `requestDelete emits ConfirmDelete when not pro`() = runTest2 {
+        // The upgrade gate is gone: requestDelete no longer short-circuits to UpgradeRoute, so the
+        // confirmation spec reaches the screen for an unowned upgrade state too.
         val a = junk("com.example.a")
         val h = harness(data = AppCleaner.Data(junks = listOf(a)), isPro = false)
         h.vm.bindRoute(AppJunkDetailsRoute(identifier = a.identifier))
         val (navList, navJob) = collectNavEvents(h.vm)
 
-        h.vm.requestDelete(DeleteSpec.WholeJunk(installId = a.identifier, appLabel = "A"))
+        val spec = DeleteSpec.WholeJunk(installId = a.identifier, appLabel = "A")
+        h.vm.requestDelete(spec)
         advanceUntilIdle()
 
-        navList.any { it is NavEvent.GoTo } shouldBe true
-        // No event emitted (upgrade is consumed by the launch return).
+        val event = h.vm.events.first()
+        event.shouldBeInstanceOf<AppJunkDetailsViewModel.Event.ConfirmDelete>()
+        event.spec shouldBe spec
+        navList shouldBe emptyList()
         navJob.cancel()
     }
 

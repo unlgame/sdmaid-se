@@ -15,7 +15,6 @@ import eu.darken.sdmse.deduplicator.core.scanner.phash.phash.PHashBits
 import eu.darken.sdmse.deduplicator.core.scanner.phash.phash.PHasher
 import eu.darken.sdmse.deduplicator.core.tasks.DeduplicatorDeleteTask
 import eu.darken.sdmse.deduplicator.core.tasks.DeduplicatorOneClickTask
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.every
@@ -26,7 +25,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import okio.ByteString
 import org.junit.jupiter.api.AfterEach
@@ -346,23 +344,27 @@ class DeduplicatorTest : BaseTest() {
         resultCluster.favoriteGroupIdentifier shouldBe Duplicate.Group.Id("g1")
     }
 
-    // ─────────────────────────── Pro gating ───────────────────────────
+    // ─────────────────────────── no Pro gating ───────────────────────────
 
     @Test
-    fun `submit DeleteTask is denied with UpgradeRequiredException when not Pro`() = runTest {
-        // The scanner/deleter providers error() if touched, so an UpgradeRequiredException proves
-        // the gate short-circuited at the boundary before any deletion work.
+    fun `submit DeleteTask is not denied when not Pro`() = runTest {
         val dedup = buildDeduplicator(isPro = false)
-        shouldThrow<UpgradeRequiredException> {
-            dedup.submit(DeduplicatorDeleteTask())
-        }
+        val thrown = runCatching { dedup.submit(DeduplicatorDeleteTask()) }.exceptionOrNull()
+
+        // Deletion used to be refused here with UpgradeRequiredException. The deny branch is gone:
+        // the submit now walks into performDelete's own state checks (the scanner and deleter
+        // providers of this harness error() if they are reached), so the failure type is left open
+        // on purpose and only the entitlement refusal is pinned as absent.
+        (thrown is UpgradeRequiredException) shouldBe false
     }
 
     @Test
-    fun `submit OneClickTask is denied with UpgradeRequiredException when not Pro`() = runTest {
+    fun `submit OneClickTask is not denied when not Pro`() = runTest {
         val dedup = buildDeduplicator(isPro = false)
-        shouldThrow<UpgradeRequiredException> {
-            dedup.submit(DeduplicatorOneClickTask())
-        }
+        val thrown = runCatching { dedup.submit(DeduplicatorOneClickTask()) }.exceptionOrNull()
+
+        // Same contract for the chained one-click path: scanning then deleting is no longer sold
+        // behind a purchase, so the submit can fail on this harness but never on the gate.
+        (thrown is UpgradeRequiredException) shouldBe false
     }
 }

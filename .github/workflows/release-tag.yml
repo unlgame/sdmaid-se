@@ -155,7 +155,10 @@ jobs:
           fi
 
       - name: Trigger GitHub Pages deployment
-        if: "!(github.event_name == 'workflow_dispatch' && inputs.dry_run)"
+        # Disabled in this fork: GitHub Pages is not enabled here, so dispatching pages.yml would
+        # only produce a failing run. Re-enable by restoring:
+        #   if: "!(github.event_name == 'workflow_dispatch' && inputs.dry_run)"
+        if: false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh workflow run pages.yml --ref main
@@ -163,7 +166,12 @@ jobs:
   release-gplay:
     name: Create Google Play release
     needs: validate-tag
-    if: always() && (needs.validate-tag.result == 'success' || github.event_name == 'workflow_dispatch')
+    # Disabled in this fork: publishing to Google Play requires the `gplay-production` environment,
+    # a Play Developer account, and `GPLAY_SERVICE_ACCOUNT_KEY_JSON_BASE64`, none of which exist
+    # here. The job and its steps are kept intact so it can be re-enabled by restoring the original
+    # condition:
+    #   if: always() && (needs.validate-tag.result == 'success' || github.event_name == 'workflow_dispatch')
+    if: false
     runs-on: ubuntu-22.04
     environment: gplay-production
     env:

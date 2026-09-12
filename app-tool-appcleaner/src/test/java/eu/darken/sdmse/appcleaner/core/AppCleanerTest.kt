@@ -33,7 +33,6 @@ import eu.darken.sdmse.common.root.RootManager
 import eu.darken.sdmse.common.sharedresource.SharedResource
 import eu.darken.sdmse.common.shell.ShellOps
 import eu.darken.sdmse.common.upgrade.UpgradeRepo
-import eu.darken.sdmse.common.upgrade.UpgradeRequiredException
 import eu.darken.sdmse.common.user.UserHandle2
 import eu.darken.sdmse.exclusion.core.ExclusionManager
 import eu.darken.sdmse.exclusion.core.types.Exclusion
@@ -591,22 +590,22 @@ class AppCleanerTest : BaseTest() {
         result.affectedPaths shouldBe emptySet()
     }
 
-    // ─────────────────────────── Pro gating ───────────────────────────
+    // ─────────────────────────── no Pro gating ───────────────────────────
 
     @Test
-    fun `submit ProcessingTask is denied with UpgradeRequiredException when not Pro`() = runTest2 {
+    fun `submit ProcessingTask is not denied when not Pro`() = runTest2 {
         val setup = setupCleaner(isPro = false)
-        // The gate throws before any processing work. If it didn't fire, performProcessing would
-        // reach the inaccessibleDeleterProvider (which error()s here) and throw a different type —
-        // so an UpgradeRequiredException proves the gate short-circuited at the boundary.
-        shouldThrow<UpgradeRequiredException> {
+        // Processing used to be refused here with UpgradeRequiredException. The submit now walks
+        // into performProcessing, which needs scan data before it deletes anything: reaching that
+        // check — instead of the old gate — is what proves the deny branch is gone.
+        val thrown = shouldThrow<IllegalStateException> {
             setup.cleaner.submit(AppCleanerProcessingTask())
         }
+        thrown.message shouldBe "Data is null"
     }
 
     @Test
     fun `submit ScanTask still succeeds when not Pro`() = runTest2 {
-        // Scanning is free; only deletion/processing is Pro-gated.
         val a = appJunk("com.example.a")
         val setup = setupCleaner(isPro = false, scanResults = listOf(a))
 

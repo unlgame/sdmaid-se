@@ -67,7 +67,9 @@ class FossUpgradeViewModelTest : BaseTest() {
     )
 
     private fun mockRepo(
-        info: MutableStateFlow<UpgradeRepoFoss.Info> = MutableStateFlow(UpgradeRepoFoss.Info()),
+        // Explicit isPro = false: Info now defaults to true, so "not a supporter" must be stated or
+        // the pitch/free-status coverage below would start from an unlocked user.
+        info: MutableStateFlow<UpgradeRepoFoss.Info> = MutableStateFlow(UpgradeRepoFoss.Info(isPro = false)),
     ): UpgradeRepoFoss = mockk<UpgradeRepoFoss>(relaxed = true).apply {
         every { upgradeInfo } returns info
         every { openGithubSponsorsPage() } returns true
@@ -87,6 +89,8 @@ class FossUpgradeViewModelTest : BaseTest() {
 
     @Test
     fun `manage route shows the free status to non-upgraded users`() = runTest2(context = testDispatcher) {
+        // Production FOSS upgradeInfo is always Pro now; this non-Pro state exists only to exercise
+        // the ViewModel's route-to-view mapping (the STATUS_FREE branch).
         val vm = buildVm()
 
         val view = async { vm.state.first { it.view != null } }
@@ -125,6 +129,8 @@ class FossUpgradeViewModelTest : BaseTest() {
 
     @Test
     fun `default and forced routes show the pitch`() = runTest2(context = testDispatcher) {
+        // Production FOSS upgradeInfo is always Pro now; the non-Pro input is only here to cover the
+        // ViewModel's else -> PITCH branch for a user who is not unlocked.
         val defaultVm = buildVm()
         val defaultView = async { defaultVm.state.first { it.view != null } }
         defaultVm.bindRoute(UpgradeRoute())
@@ -140,6 +146,8 @@ class FossUpgradeViewModelTest : BaseTest() {
 
     @Test
     fun `asking for upgrade options switches the free status to the pitch`() = runTest2(context = testDispatcher) {
+        // Production FOSS upgradeInfo is always Pro now; the non-Pro input is only here to cover the
+        // ViewModel's STATUS_FREE -> PITCH transition.
         val vm = buildVm()
         vm.bindRoute(UpgradeRoute(manage = true))
 
@@ -175,7 +183,8 @@ class FossUpgradeViewModelTest : BaseTest() {
     fun `completing the upgrade lands on the upgraded status even from the pitch`() = runTest2(
         context = testDispatcher,
     ) {
-        val info = MutableStateFlow(UpgradeRepoFoss.Info())
+        // Starts on the pitch, so the input has to be explicitly non-Pro (the default is now true).
+        val info = MutableStateFlow(UpgradeRepoFoss.Info(isPro = false))
         val vm = buildVm(repo = mockRepo(info))
         vm.bindRoute(UpgradeRoute(manage = true))
         vm.onShowUpgradeOptions()
@@ -198,7 +207,8 @@ class FossUpgradeViewModelTest : BaseTest() {
         // Forced routes (Pro-locked settings entry) deliberately don't auto-close, so the screen is
         // still up when the unlock lands — it must flip to the supporter status instead of keeping
         // the sales pitch, which reads as "sponsoring didn't work".
-        val info = MutableStateFlow(UpgradeRepoFoss.Info())
+        // Starts on the pitch, so the input has to be explicitly non-Pro (the default is now true).
+        val info = MutableStateFlow(UpgradeRepoFoss.Info(isPro = false))
         val vm = buildVm(repo = mockRepo(info))
 
         val navEvents = mutableListOf<NavEvent>()

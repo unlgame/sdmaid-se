@@ -46,15 +46,15 @@ class UpgradeRepoFoss @Inject constructor(
         .flatMapLatest {
             fossCache.upgrade.flow
                 .map { data ->
-                    if (data == null) {
-                        Info()
-                    } else {
-                        Info(
-                            isPro = true,
-                            upgradedAt = data.upgradedAt,
-                            fossUpgradeType = data.upgradeType,
-                        )
-                    }
+                    // Pro is unconditional in this build. The FOSS flavor has no billing backend to
+                    // consult, so the local sponsorship record can no longer decide entitlement: a
+                    // missing record means "unlocked", not "not entitled". The record is still read
+                    // and surfaced, so the supporter-since date keeps working for actual sponsors.
+                    Info(
+                        isPro = true,
+                        upgradedAt = data?.upgradedAt,
+                        fossUpgradeType = data?.upgradeType,
+                    )
                 }
                 // Same coroutine as the throw below, so the ordering is guaranteed. Only
                 // successfully mapped elements pass here — catch emissions go straight downstream
@@ -124,7 +124,9 @@ class UpgradeRepoFoss @Inject constructor(
     }
 
     data class Info(
-        override val isPro: Boolean = false,
+        // Defaults to unlocked: every construction path that does not explicitly pass a value
+        // (the error fallback below, and tests) must not reintroduce the gate.
+        override val isPro: Boolean = true,
         override val upgradedAt: Instant? = null,
         val fossUpgradeType: FossUpgrade.Type? = null,
         override val error: Throwable? = null,

@@ -19,7 +19,6 @@ import eu.darken.sdmse.common.ca.CaString
 import eu.darken.sdmse.common.ca.toCaString
 import eu.darken.sdmse.common.datastore.DataStoreValue
 import eu.darken.sdmse.common.navigation.NavEvent
-import eu.darken.sdmse.common.navigation.routes.UpgradeRoute
 import eu.darken.sdmse.common.pkgs.Pkg
 import eu.darken.sdmse.common.pkgs.features.InstallDetails
 import eu.darken.sdmse.common.pkgs.features.InstallId
@@ -665,25 +664,22 @@ class AppControlListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `onForceStopRequested with multi-select on free tier navigates to upgrade`() = runTest2 {
-        // Multi-select force-stop is a Pro feature. Free users must hit the upgrade route
-        // instead of being asked to confirm.
+    fun `onForceStopRequested with multi-select emits ConfirmForceStop without navigating`() = runTest2 {
+        // Entitlement checks are unconditional in this build: multi-select force-stop asks for
+        // confirmation like any other target count, with no upgrade detour.
         val a = appInfo("com.a.app")
         val b = appInfo("com.b.app")
         val h = harness(data = dataOf(a, b), isPro = false)
         val nav = collectNavEvents(h.vm)
-        val collected = collectEvents(h.vm)
 
         h.vm.onForceStopRequested(setOf(a.installId, b.installId))
         advanceUntilIdle()
 
-        val navEvent = nav.list.single()
-        navEvent.shouldBeInstanceOf<NavEvent.GoTo>()
-        navEvent.destination shouldBe UpgradeRoute()
-        // No confirm event emitted.
-        collected.list shouldBe emptyList()
+        val event = h.vm.events.first()
+        event.shouldBeInstanceOf<AppControlListViewModel.Event.ConfirmForceStop>()
+        event.ids shouldBe setOf(a.installId, b.installId)
+        nav.list shouldBe emptyList()
         nav.cancel()
-        collected.cancel()
     }
 
     @Test

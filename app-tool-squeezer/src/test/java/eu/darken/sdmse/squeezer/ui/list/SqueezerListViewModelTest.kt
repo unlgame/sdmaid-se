@@ -285,19 +285,37 @@ class SqueezerListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `compress confirmed when not pro navigates to UpgradeRoute and does not submit`() = runTest2 {
+    fun `compress confirmed submits when not pro`() = runTest2 {
+        // The upgrade gate is gone: a confirmed compression submits instead of rerouting to the
+        // sponsorship screen, and the result is reported back through TaskResult.
         val a = image("a.jpg")
         val h = harness(data = Squeezer.Data(media = setOf(a)), isPro = false)
         h.vm.state.first()  // prime
         val collectedNav = collectNavEvents(h.vm)
 
+        val processSuccess = SqueezerProcessTask.Success(
+            affectedSpace = 100L,
+            affectedPaths = setOf(a.path),
+            processedCount = 1,
+        )
+        coEvery { h.taskSubmitter.submit(any()) } returns processSuccess
+
         h.vm.compress(setOf(a.identifier), confirmed = true)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { h.taskSubmitter.submit(any()) }
-        // Exactly one nav event, targeting the upgrade route.
-        collectedNav.list.size shouldBe 1
-        collectedNav.list.single().shouldBeInstanceOf<NavEvent.GoTo>()
+        coVerify(exactly = 1) {
+            h.taskSubmitter.submit(
+                SqueezerProcessTask(
+                    mode = SqueezerProcessTask.TargetMode.Selected(setOf(a.identifier)),
+                    qualityOverride = null,
+                ),
+            )
+        }
+
+        val event = h.vm.events.first()
+        event.shouldBeInstanceOf<SqueezerListViewModel.Event.TaskResult>()
+        event.result shouldBe processSuccess
+        collectedNav.list shouldBe emptyList()
         collectedNav.cancel()
     }
 
