@@ -5,7 +5,6 @@ import androidx.lifecycle.SavedStateHandle
 import eu.darken.sdmse.common.ViewIntentTool
 import eu.darken.sdmse.common.datastore.DataStoreValue
 import eu.darken.sdmse.common.navigation.NavEvent
-import eu.darken.sdmse.common.navigation.routes.UpgradeRoute
 import eu.darken.sdmse.common.previews.PreviewRoute
 import eu.darken.sdmse.common.progress.Progress
 import eu.darken.sdmse.common.upgrade.UpgradeRepo
@@ -557,7 +556,9 @@ class DeduplicatorDetailsViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `deleteCluster confirmed without pro navigates to UpgradeRoute and does NOT submit`() = runTest2 {
+    fun `deleteCluster confirmed submits TargetMode_Clusters without navigating`() = runTest2 {
+        // Entitlement checks are unconditional in this build, so a confirmed delete always submits
+        // the task instead of routing to the upgrade screen.
         val a = cluster("a")
         val h = harness(clusters = setOf(a), isPro = false)
         h.vm.bindRoute(DeduplicatorDetailsRoute(identifier = a.identifier))
@@ -566,10 +567,17 @@ class DeduplicatorDetailsViewModelTest : BaseTest() {
         h.vm.deleteCluster(a.identifier, confirmed = true)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { h.taskSubmitter.submit(any()) }
-        val event = nav.list.single()
-        event.shouldBeInstanceOf<NavEvent.GoTo>()
-        event.destination shouldBe UpgradeRoute()
+        coVerify(exactly = 1) {
+            h.taskSubmitter.submit(
+                DeduplicatorDeleteTask(
+                    mode = DeduplicatorDeleteTask.TargetMode.Clusters(
+                        targets = setOf(a.identifier),
+                        deleteAll = false,
+                    ),
+                ),
+            )
+        }
+        nav.list shouldBe emptyList()
         nav.cancel()
     }
 
@@ -619,7 +627,9 @@ class DeduplicatorDetailsViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `deleteGroup confirmed without pro navigates to UpgradeRoute and does NOT submit`() = runTest2 {
+    fun `deleteGroup confirmed submits TargetMode_Groups without navigating`() = runTest2 {
+        // Entitlement checks are unconditional in this build, so a confirmed delete always submits
+        // the task instead of routing to the upgrade screen.
         val a = cluster("a")
         val groupId = a.groups.first().identifier
         val h = harness(clusters = setOf(a), isPro = false)
@@ -629,10 +639,17 @@ class DeduplicatorDetailsViewModelTest : BaseTest() {
         h.vm.deleteGroup(a.identifier, groupId, confirmed = true)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { h.taskSubmitter.submit(any()) }
-        val event = nav.list.single()
-        event.shouldBeInstanceOf<NavEvent.GoTo>()
-        event.destination shouldBe UpgradeRoute()
+        coVerify(exactly = 1) {
+            h.taskSubmitter.submit(
+                DeduplicatorDeleteTask(
+                    mode = DeduplicatorDeleteTask.TargetMode.Groups(
+                        targets = setOf(groupId),
+                        deleteAll = false,
+                    ),
+                ),
+            )
+        }
+        nav.list shouldBe emptyList()
         nav.cancel()
     }
 
@@ -694,7 +711,9 @@ class DeduplicatorDetailsViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `deleteDuplicates confirmed without pro navigates to UpgradeRoute and does NOT submit`() = runTest2 {
+    fun `deleteDuplicates confirmed submits TargetMode_Duplicates without navigating`() = runTest2 {
+        // Entitlement checks are unconditional in this build, so a confirmed delete always submits
+        // the task instead of routing to the upgrade screen.
         val a = cluster("a", dupeSizes = listOf(100L, 100L))
         val dupe = a.groups.first().duplicates.first()
         val h = harness(clusters = setOf(a), isPro = false)
@@ -704,10 +723,14 @@ class DeduplicatorDetailsViewModelTest : BaseTest() {
         h.vm.deleteDuplicates(a.identifier, ids = setOf(dupe.identifier), confirmed = true)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { h.taskSubmitter.submit(any()) }
-        val event = nav.list.single()
-        event.shouldBeInstanceOf<NavEvent.GoTo>()
-        event.destination shouldBe UpgradeRoute()
+        coVerify(exactly = 1) {
+            h.taskSubmitter.submit(
+                DeduplicatorDeleteTask(
+                    mode = DeduplicatorDeleteTask.TargetMode.Duplicates(targets = setOf(dupe.identifier)),
+                ),
+            )
+        }
+        nav.list shouldBe emptyList()
         nav.cancel()
     }
 

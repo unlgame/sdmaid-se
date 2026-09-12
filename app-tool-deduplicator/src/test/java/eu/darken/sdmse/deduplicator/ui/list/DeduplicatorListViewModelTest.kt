@@ -824,7 +824,9 @@ class DeduplicatorListViewModelTest : BaseTest() {
     }
 
     @Test
-    fun `deleteClusters confirmed without pro navigates to upgrade and does NOT submit`() = runTest2 {
+    fun `deleteClusters confirmed submits TargetMode_Clusters without navigating`() = runTest2 {
+        // Entitlement checks are unconditional in this build, so confirmation always submits the
+        // delete task instead of routing to the upgrade screen.
         val c = cluster("a")
         val h = harness(clusters = setOf(c), isPro = false)
         val nav = collectNavEvents(h.vm)
@@ -832,9 +834,17 @@ class DeduplicatorListViewModelTest : BaseTest() {
         h.vm.deleteClusters(listOf(c), confirmed = true)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { h.taskSubmitter.submit(any()) }
-        nav.list.size shouldBe 1
-        nav.list.single().shouldBeInstanceOf<NavEvent.GoTo>()
+        coVerify(exactly = 1) {
+            h.taskSubmitter.submit(
+                DeduplicatorDeleteTask(
+                    mode = DeduplicatorDeleteTask.TargetMode.Clusters(
+                        targets = setOf(c.identifier),
+                        deleteAll = false,
+                    ),
+                ),
+            )
+        }
+        nav.list shouldBe emptyList()
         nav.cancel()
     }
 

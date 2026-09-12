@@ -2,7 +2,6 @@ package eu.darken.sdmse.common.backup
 
 import android.content.Context
 import eu.darken.sdmse.common.upgrade.UpgradeRepo
-import eu.darken.sdmse.common.upgrade.UpgradeRequiredException
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -157,10 +156,18 @@ class ConfigBackupManagerTest : BaseTest() {
     }
 
     @Test
-    fun `writeBackup is denied for non-pro users`(@TempDir tmp: Path) = runTest {
-        shouldThrow<UpgradeRequiredException> {
-            manager(tmp, pro = false).writeBackup(ByteArrayOutputStream())
-        }
+    fun `writeBackup is not denied for non-pro users`(@TempDir tmp: Path) = runTest {
+        val out = ByteArrayOutputStream()
+        val result = manager(tmp, sections = setOf(FakeContributor("appcleaner")), pro = false).writeBackup(out)
+
+        // The export used to be refused here with UpgradeRequiredException. It now writes for
+        // everyone: the archive is produced and parses back like any other.
+        result.written shouldBe setOf("appcleaner")
+        result.isCompleteSuccess shouldBe true
+
+        val roundtrip = File.createTempFile("nonpro-", ".zip", tmp.toFile())
+        roundtrip.writeBytes(out.toByteArray())
+        manager(tmp).parse(roundtrip).version shouldBe BackupEnvelope.VERSION
     }
 
     @Test

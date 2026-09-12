@@ -495,9 +495,12 @@ internal class DashboardMainActionEngineTest : BaseTest() {
     }
 
     @Test
-    fun `a non-Pro AppCleaner upsell fires even when an opted-out free tool has data`() {
+    fun `an AppCleaner-only DELETE cleans even when an opted-out free tool has data`() {
         // The upsell guard used to test raw CorpseFinder/SystemCleaner data, so an opted-out tool
         // with findings silently blocked it — the DELETE branch then did nothing whatsoever.
+        //
+        // Entitlement no longer plays into this branch, so the same shape now has to clean: the
+        // opted-out free tool is skipped and AppCleaner's findings are submitted.
         val appData = mockk<AppCleaner.Data>(relaxed = true) {
             every { junks } returns setOf(mockk(relaxed = true))
         }
@@ -514,8 +517,10 @@ internal class DashboardMainActionEngineTest : BaseTest() {
         try {
             h.engine.mainAction(BottomBarState.Action.DELETE)
 
-            upgradeRequired shouldBe 1
-            h.submittedTasks.shouldBeEmpty()
+            upgradeRequired shouldBe 0
+            h.submittedTasks.filterIsInstance<AppCleanerProcessingTask>().size shouldBe 1
+            // The opted-out free tool stays out of the run.
+            h.submittedTasks.filterIsInstance<CorpseFinderDeleteTask>().shouldBeEmpty()
         } finally {
             h.engineScope.cancel()
         }

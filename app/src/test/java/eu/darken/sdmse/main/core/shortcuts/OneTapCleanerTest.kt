@@ -61,10 +61,11 @@ class OneTapCleanerTest : BaseTest() {
     }
 
     @Test
-    fun `runOneClick returns NotPro and submits nothing when not Pro`() = runTest {
+    fun `runOneClick returns Ran and submits the enabled tools when not Pro`() = runTest {
+        // The one-tap clean used to return NotPro here; nothing is gated behind an entitlement now.
         setup(pro = false, corpse = true)
-        create().runOneClick(shortcutMode = true) shouldBe OneTapCleaner.Outcome.NotPro
-        coVerify(exactly = 0) { taskManager.submit(any()) }
+        create().runOneClick(shortcutMode = true) shouldBe OneTapCleaner.Outcome.Ran
+        coVerify(exactly = 1) { taskManager.submit(ofType(CorpseFinderOneClickTask::class)) }
     }
 
     @Test
